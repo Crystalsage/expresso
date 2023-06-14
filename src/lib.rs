@@ -103,7 +103,6 @@ pub fn evaluate_rpn(input: String) -> u32 {
     return st.pop();
 }
 
-
 /// Converts an infix expression to a postfix expression
 /// using the Shunting Yard algorithm.
 ///
@@ -178,6 +177,101 @@ pub fn infix_to_rpn(input: String) -> String {
 }
 
 
+
+fn add_to_output(output: &mut Vec<u32>, n: u32) {
+    output.push(n);
+}
+
+
+fn handle_pop(st: &mut Stack<char>, output: &mut Vec<u32>) -> Option<u32> {
+    let op = st.pop();
+
+    if op == '(' {
+        return None;
+    }
+
+    let right = output.pop().unwrap();
+    let left = output.pop().unwrap();
+
+    match op {
+        '+' => Some(left + right),
+        '-' => Some(left - right),
+        '*' => Some(left * right),
+        '/' => Some(left / right),
+        '^' => Some(left.pow(right)),
+        _ => panic!("Unexpected operator: {}", op),
+    }
+}
+
+
+/// Same as Shunting Yard Algorithm, but also evaluates the expression
+/// on-the-fly.
+pub fn sy_evaulate(input: String) -> u32 {
+    let mut st: Stack<char> = Stack::new();
+    let mut output: Vec<u32> = Vec::new();
+
+    let mut input_chars = input.chars();
+
+    loop {
+        let Some(input_char) = input_chars.next() else { break; };
+
+        if input_char.is_whitespace() {
+            continue;
+        }
+
+        if input_char.is_digit(10) {
+            add_to_output(&mut output, input_char.to_digit(10).unwrap());
+            continue;
+        }
+        
+        if input_char == '(' {
+            st.push(input_char);
+            continue;
+        }
+
+        if input_char == ')' {
+            let mut top = st.peek();
+            while top != Some(&'(') {
+                assert_ne!(st.len(), 0);
+                let res = handle_pop(&mut st, &mut output);
+                add_to_output(&mut output, res.unwrap());
+                top = st.peek();
+            }
+            assert_eq!(st.peek(), Some(&'('));
+            st.pop();
+            continue;
+        }
+
+        if Operator::is_valid(input_char) {
+            let o1 = input_char;
+            let mut o2 = st.peek();
+
+            let o1_prec = Operator::get_precedence(&o1);
+            let o2_prec = Operator::get_precedence(&o2.unwrap_or(&'+'));
+
+            while o2.is_some() && o2 != Some(&'(')
+                && (o2_prec > o1_prec || (o2_prec == o1_prec && Operator::get_associativity(o1) == true))
+
+            {
+                let res = handle_pop(&mut st, &mut output).unwrap();
+                add_to_output(&mut output, res);
+                o2 = st.peek();
+            }
+
+            st.push(o1);
+        }
+    }
+
+    while st.len() != 0 {
+        assert_ne!(st.peek(), Some(&'('));
+        let res = handle_pop(&mut st, &mut output).unwrap();
+        add_to_output(&mut output, res);
+    }
+
+    return output[0];
+}
+
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -201,5 +295,10 @@ mod tests {
     #[test]
     fn test_infix_to_postfix() {
         assert_eq!(infix_to_rpn("1 + 2 * 3 - 4".to_string()), "1 2 3 * + 4 -");
+    }
+
+    #[test]
+    fn test_sy_evaluator() {
+        assert_eq!(sy_evaulate("1 + 2 * 3 - 4".to_string()), 3);
     }
 }
