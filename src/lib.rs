@@ -178,12 +178,11 @@ pub fn infix_to_rpn(input: String) -> String {
 
 
 
-fn add_to_output(output: &mut Vec<u32>, n: u32) {
+fn evaluator_add_to_output(output: &mut Vec<u32>, n: u32) {
     output.push(n);
 }
 
-
-fn handle_pop(st: &mut Stack<char>, output: &mut Vec<u32>) -> Option<u32> {
+fn evaluator_handle_pop(st: &mut Stack<char>, output: &mut Vec<u32>) -> Option<u32> {
     let op = st.pop();
 
     if op == '(' {
@@ -220,7 +219,7 @@ pub fn sy_evaulate(input: String) -> u32 {
         }
 
         if input_char.is_digit(10) {
-            add_to_output(&mut output, input_char.to_digit(10).unwrap());
+            evaluator_add_to_output(&mut output, input_char.to_digit(10).unwrap());
             continue;
         }
         
@@ -233,8 +232,8 @@ pub fn sy_evaulate(input: String) -> u32 {
             let mut top = st.peek();
             while top != Some(&'(') {
                 assert_ne!(st.len(), 0);
-                let res = handle_pop(&mut st, &mut output);
-                add_to_output(&mut output, res.unwrap());
+                let res = evaluator_handle_pop(&mut st, &mut output);
+                evaluator_add_to_output(&mut output, res.unwrap());
                 top = st.peek();
             }
             assert_eq!(st.peek(), Some(&'('));
@@ -253,8 +252,8 @@ pub fn sy_evaulate(input: String) -> u32 {
                 && (o2_prec > o1_prec || (o2_prec == o1_prec && Operator::get_associativity(o1) == true))
 
             {
-                let res = handle_pop(&mut st, &mut output).unwrap();
-                add_to_output(&mut output, res);
+                let res = evaluator_handle_pop(&mut st, &mut output).unwrap();
+                evaluator_add_to_output(&mut output, res);
                 o2 = st.peek();
             }
 
@@ -264,13 +263,85 @@ pub fn sy_evaulate(input: String) -> u32 {
 
     while st.len() != 0 {
         assert_ne!(st.peek(), Some(&'('));
-        let res = handle_pop(&mut st, &mut output).unwrap();
-        add_to_output(&mut output, res);
+        let res = evaluator_handle_pop(&mut st, &mut output).unwrap();
+        evaluator_add_to_output(&mut output, res);
     }
 
     return output[0];
 }
 
+
+// ============== TOKENIZER BELOW =================
+#[derive(Debug)]
+enum Tokens {
+    Number(u32),
+    Plus,
+    Minus,
+    Asterisk,
+    Slash,
+    Caret,
+    ParenLeft,
+    ParenRight,
+}
+
+struct Tokenizer {
+    tokens: Vec<Tokens>,
+    raw_input: String,
+}
+
+impl Tokenizer {
+    fn new(input: String) -> Self {
+        let mut input_chars = input.chars();
+        let mut tokens: Vec<Tokens> = Vec::new();
+
+        loop {
+            let Some(mut input_char) = input_chars.next() else { break; };
+
+            if input_char.is_digit(10) {
+                let mut num = "".to_string();
+                num.push(input_char);
+                loop {
+                    input_char = input_chars.next().unwrap();
+                    if input_char.is_digit(10) {
+                        num.push(input_char);
+                    } else {
+                        break;
+                    }
+                }
+                tokens.push(Tokens::Number(num.parse::<u32>().unwrap()));
+                continue;
+            }
+
+            match input_char {
+                '+' => tokens.push(Tokens::Plus),
+                '-' => tokens.push(Tokens::Minus),
+                '*' => tokens.push(Tokens::Asterisk),
+                '/' => tokens.push(Tokens::Slash),
+                '^' => tokens.push(Tokens::Asterisk),
+                '(' => tokens.push(Tokens::ParenLeft),
+                ')' => tokens.push(Tokens::ParenRight),
+                ' ' => continue,
+                _ => panic!("Unexpected character: {}", input_char),
+            }
+        }
+
+        Tokenizer {
+            tokens,
+            raw_input: input,
+        }
+    }
+
+    fn default() -> Self {
+        Tokenizer {
+            tokens: Vec::new(),
+            raw_input: String::new(),
+        }
+    }
+
+    fn iter(self: &Self) -> impl Iterator<Item=&Tokens> {
+        self.tokens.iter()
+    }
+}
 
 #[cfg(test)]
 mod tests {
@@ -300,5 +371,24 @@ mod tests {
     #[test]
     fn test_sy_evaluator() {
         assert_eq!(sy_evaulate("1 + 2 * 3 - 4".to_string()), 3);
+    }
+
+    #[test]
+    fn test_tokenizer() {
+        let tokens: Vec<Tokens> = vec![
+            Tokens::Number(1),
+            Tokens::Plus,
+            Tokens::Number(2),
+            Tokens::Asterisk,
+            Tokens::Number(3),
+            Tokens::Minus,
+            Tokens::Number(4),
+        ];
+
+        let resulting_tokens = Tokenizer::new("1 + 2 * 3 - 4".to_string()).tokens;
+
+        for (token, other) in resulting_tokens.iter().zip(tokens) {
+            assert!(!matches!(token, other))
+        }
     }
 }
