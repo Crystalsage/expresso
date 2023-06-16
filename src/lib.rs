@@ -204,7 +204,7 @@ fn evaluator_handle_pop(st: &mut Stack<char>, output: &mut Vec<u32>) -> Option<u
 
 
 /// Same as Shunting Yard Algorithm, but also evaluates the expression
-/// on-the-fly.
+/// on-the-fly. Uses `Tokenizer`.
 pub fn sy_evaulate(input: String) -> u32 {
     let mut st: Stack<char> = Stack::new();
     let mut output: Vec<u32> = Vec::new();
@@ -272,7 +272,7 @@ pub fn sy_evaulate(input: String) -> u32 {
 
 
 // ============== TOKENIZER BELOW =================
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 enum Tokens {
     Number(u32),
     Plus,
@@ -295,13 +295,13 @@ impl Tokenizer {
         let mut tokens: Vec<Tokens> = Vec::new();
 
         loop {
-            let Some(mut input_char) = input_chars.next() else { break; };
+            let Some(input_char) = input_chars.next() else { break; };
 
             if input_char.is_digit(10) {
                 let mut num = "".to_string();
                 num.push(input_char);
                 loop {
-                    input_char = input_chars.next().unwrap();
+                    let Some(input_char) = input_chars.next() else { break; };
                     if input_char.is_digit(10) {
                         num.push(input_char);
                     } else {
@@ -317,7 +317,7 @@ impl Tokenizer {
                 '-' => tokens.push(Tokens::Minus),
                 '*' => tokens.push(Tokens::Asterisk),
                 '/' => tokens.push(Tokens::Slash),
-                '^' => tokens.push(Tokens::Asterisk),
+                '^' => tokens.push(Tokens::Caret),
                 '(' => tokens.push(Tokens::ParenLeft),
                 ')' => tokens.push(Tokens::ParenRight),
                 ' ' => continue,
@@ -342,6 +342,7 @@ impl Tokenizer {
         self.tokens.iter()
     }
 }
+// ============== TOKENIZER ABOVE =================
 
 #[cfg(test)]
 mod tests {
@@ -387,8 +388,10 @@ mod tests {
 
         let resulting_tokens = Tokenizer::new("1 + 2 * 3 - 4".to_string()).tokens;
 
-        for (token, other) in resulting_tokens.iter().zip(tokens) {
-            assert!(!matches!(token, other))
+        for (token1, token2) in tokens.iter().zip(resulting_tokens.iter()) {
+            if token1 != token2 {
+                assert!(false);
+            }
         }
     }
 }
